@@ -2,13 +2,19 @@
 
 **A 2D spatial layout engine, reachable as an MCP server.** Define a bounded
 space in real millimetres, place things in it, validate, render, and project
-elevations from the plan.
+elevations and sections from the plan.
 
 ```
 https://skopia.datatreehaus.com/v1
 ```
 
+[![MCP Registry](https://img.shields.io/badge/MCP_Registry-com.datatreehaus%2Fskopia--floor--plan--layout-5DBF80?style=flat-square)](https://registry.modelcontextprotocol.io/v0/servers?search=skopia)
+[![Add to Cursor](https://img.shields.io/badge/Cursor-Add_Skopia-141414?style=flat-square)](https://cursor.com/en/install-mcp?name=skopia&config=eyJ1cmwiOiJodHRwczovL3Nrb3BpYS5kYXRhdHJlZWhhdXMuY29tL3YxIiwiaGVhZGVycyI6eyJBdXRob3JpemF0aW9uIjoiQmVhcmVyICR7ZW52OlNLT1BJQV9LRVl9In19)
+[![Add to VS Code](https://img.shields.io/badge/VS_Code-Add_Skopia-0098FF?style=flat-square)](https://vscode.dev/redirect/mcp/install?name=skopia&config=%7B%22name%22%3A%22skopia%22%2C%22type%22%3A%22http%22%2C%22url%22%3A%22https%3A%2F%2Fskopia.datatreehaus.com%2Fv1%22%2C%22headers%22%3A%7B%22Authorization%22%3A%22Bearer%20%24%7Binput%3Askopia-key%7D%22%7D%2C%22inputs%22%3A%5B%7B%22id%22%3A%22skopia-key%22%2C%22type%22%3A%22promptString%22%2C%22password%22%3Atrue%2C%22description%22%3A%22Your%20Skopia%20key%20(free%2C%20from%20https%3A%2F%2Fskopia.datatreehaus.com)%22%7D%5D%7D)
+
 Every call needs a key. Getting one is free, instant, and needs no approval.
+The one-click installs above carry no key: Cursor reads `SKOPIA_KEY` from
+your environment, VS Code asks for it as it installs.
 
 ## Quick start
 
@@ -24,8 +30,8 @@ claude mcp add --transport http skopia \
   --header "Authorization: Bearer YOUR_KEY"
 ```
 
-Codex, `.mcp.json` and raw HTTP are covered at
-[/setup](https://skopia.datatreehaus.com/setup).
+Cursor, VS Code, Codex, `.mcp.json`, Claude Desktop (via `mcp-remote`) and
+raw HTTP are covered at [/setup](https://skopia.datatreehaus.com/setup).
 
 ## What it does that a model cannot do for itself
 
@@ -153,6 +159,26 @@ agent's shoulder.
 Fifteen tools is standing context on every turn, so narrower surfaces exist:
 `/v1/core`, `/v1/elevation`, `/v1/advisory`, and they compose
 (`/v1/core+elevation`). A key can carry a profile instead.
+
+Every tool is a pure function and says so over the wire (`readOnlyHint`,
+`idempotentHint`): nothing is stored, so a client that auto-approves
+read-only tools can approve all of these.
+
+## Prompts
+
+Four workflows, served as MCP prompts, so a client that lists them shows the
+order to do things in rather than a vocabulary. In Claude Code they arrive as
+slash commands.
+
+| | |
+|---|---|
+| `build_a_room` | A description of a room to a validated, rendered plan |
+| `survey_to_drawings` | A measured survey to plan, sections and elevations, asking for what was never measured |
+| `check_a_layout` | Validate, then check against a spacing rule *you* supply |
+| `seat_a_room` | Place and number tables; report joins as suggestions, never capacity |
+
+Each names the tools it uses and is listed only where every one is mounted,
+so a prompt cannot walk a model into a tool the endpoint does not serve.
 
 ## Status, honestly
 
