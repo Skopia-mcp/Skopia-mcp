@@ -1,0 +1,73 @@
+# Publish this server to the MCP Registry.
+#
+# The listing is `com.datatreehaus/skopia-floor-plan-layout`, a domain
+# namespace, so the credential is an Ed25519 key whose PUBLIC half is served
+# at https://datatreehaus.com/.well-known/mcp-registry-auth and whose private
+# half is the repository secret MCP_REGISTRY_KEY. GitHub OIDC cannot publish
+# under this namespace; it only ever proved `io.github.*`.
+#
+# If the key is ever lost, nothing is stranded: generate a fresh pair, put the
+# new public half in that well-known file, redeploy datatreehaus.com, and set
+# the secret again. Rotating does not disturb the listing that is already up.
+#
+# It fires on a version tag, so publishing is a deliberate act:
+#   git tag v0.1.0 && git push origin v0.1.0
+#
+# The version in server.json is overwritten from the tag, so the tag is the
+# single source of truth and the two can never disagree.
+
+name: Publish to MCP Registry
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:      # so a first publish can be run from the Actions tab
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v5
+
+      # The endpoint must be publicly reachable before it is listed. The
+      # registry says a remote server MUST be available at its URL, and a
+      # dead listing is worse than none.
+      - name: Check the endpoint is alive
+        run: |
+          URL=$(jq -r '.remotes[0].url' server.json)
+          echo "Probing $URL"
+          code=$(curl -sS -o /tmp/probe.json -w '%{http_code}' "$URL" \
+            -H 'content-type: application/json' \
+            -H 'MCP-Protocol-Version: 2026-07-28' \
+            -H 'Mcp-Method: server/discover' \
+            -d '{"jsonrpc":"2.0","id":1,"method":"server/discover","params":{"_meta":{
+                 "io.modelcontextprotocol/protocolVersion":"2026-07-28",
+                 "io.modelcontextprotocol/clientCapabilities":{}}}}')
+          test "$code" = "200" || { echo "endpoint returned $code"; cat /tmp/probe.json; exit 1; }
+          jq -e '.result.supportedVersions | index("2026-07-28")' /tmp/probe.json > /dev/null
+          echo "endpoint healthy"
+
+      - name: Take the version from the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          jq --arg v "$VERSION" '.version = $v' server.json > server.tmp && mv server.tmp server.json
+          echo "publishing $VERSION"
+
+      - name: Install mcp-publisher
+        run: |
+          curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
+
+      # Fails loudly if the secret is missing rather than publishing nothing.
+      - name: Authenticate
+        run: |
+          test -n "$MCP_KEY" || { echo "MCP_REGISTRY_KEY is not set"; exit 1; }
+          ./mcp-publisher login http --domain=datatreehaus.com --private-key="$MCP_KEY"
+        env:
+          MCP_KEY: ${{ secrets.MCP_REGISTRY_KEY }}
+
+      - name: Publish
+        run: ./mcp-publisher publish
