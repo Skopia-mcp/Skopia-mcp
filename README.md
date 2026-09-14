@@ -29,9 +29,16 @@ Codex, `.mcp.json` and raw HTTP are covered at
 
 ## What it does that a model cannot do for itself
 
-A model asked to draw a floor plan will emit SVG. The walls will not quite
-close, the elevation will not agree with the plan, and it will look entirely
-fine. That is the problem this exists to remove.
+A model asked to draw a floor plan will emit SVG, and it will look entirely
+fine. The walls will not quite close, the elevation will not agree with the
+plan, and the door will swing out of its hinge. Nothing will fail. That is
+the problem this exists to remove.
+
+**An agent cannot draw a door wrong here, because it does not draw the
+door.** It names one — panelled, part-glazed, three rows — and the same
+component answers in the plan, the elevation and the section. The swing is
+derived once and reviewed once, and cannot come out of the hinge on a
+Tuesday.
 
 - **Elevations cannot disagree with the plan.** Not through care. A
   horizontal position in an elevation is a *reference* to a plan feature
@@ -54,22 +61,96 @@ fine. That is the problem this exists to remove.
   wheelchair ratios are yours to supply and yours to stand behind. Wrong
   numbers inside software a fire officer reads are a liability, not a bug.
 
+## We wrote the alternative, and it was wrong three times
+
+The case for this had to be tested rather than asserted, so the competitor is
+a real file in our repository: a hand-written script that draws the same
+house. It was written with the engine's source open — its palette, its wall
+conventions, its house data — and corrected three times against renders with
+a person reviewing. It is not a cold run and we will not present it as one.
+
+Which makes the failures sharper rather than softer. Given every one of those
+advantages, it was still wrong three times.
+
+1. The door's swing arc sprang from the *hinge* instead of the leaf's tip, so
+   it floated into the room ending nowhere near the far jamb.
+2. Windows were bare white gaps — no frame, no glass line. A hole in a wall,
+   not a window.
+3. The internal walls had **no doors in them at all**. Three rooms, no way
+   into any of them.
+
+Every version rendered cleanly. Two of the three faults were invisible at the
+size the drawing was reviewed at, and the third survived two rounds of review
+looking perfectly reasonable. An agent running unattended ships it.
+
+**Tokens are not the argument.** On raw count, a script an agent writes once
+still beats calling this — the drawing goes to a file, where a tool result
+comes back into the context — and our own benchmark says so plainly rather
+than burying it. The argument is that the cheap path's failures are silent,
+plausible, and found by a human or not at all.
+
+The cheap version is the wrong one, every time.
+
+We have **not** measured tokens-to-completion for a cold agent. That needs a
+real run against a brief, with no sight of this engine's source, recorded to
+the point where the drawings are actually right. We have not done it, and
+nothing above is quoted as though we had.
+
+## And then we ran it ourselves, and it was wrong too
+
+One agent, one brief, this engine, September 2026. It cost about **269,000
+tokens** and the drawings came out wrong: a section facing the wrong way, a
+blank section B–B, a two-over-two sash that was not one, 1:50 too small for
+the sheet, and eight dimension queries too small to read.
+
+- **Looking is the job.** About 100,000 of those tokens — 37% — were
+  rendering a drawing and looking at it, roughly 8,000 a picture. An agent
+  writing its own SVG has the identical loop at the identical price, so the
+  biggest cost in the job is common to both sides and cancels out of the
+  comparison entirely. Our own benchmark never counted it.
+- **Reading the engine cost ~65,000 tokens** before any work started. Over
+  MCP that is a tool list instead — which is the honest argument for the
+  server, and one we had backwards.
+- **The refusals did their job.** A spot level the schema could not hold and
+  two unused wall thicknesses were reported rather than silently dropped.
+
+So: naming a component removes a *class* of error, not the category. An agent
+can still ask for the wrong one, point a section the wrong way, or produce a
+drawing that comes out blank. We have done all three.
+
+We have **not** run the other side cold. There is no A/B here and we will not
+imply one.
+
+## When not to use it
+
+If you want one sketch, once, and nobody is going to build from it, emit the
+SVG yourself. It is free, it needs no key, and it will be fine.
+
+Reach for this when the drawings have to agree with each other, when somebody
+is going to measure one, or when nobody is going to be looking over the
+agent's shoulder.
+
 ## Tools
 
 | | |
 |---|---|
 | `edit_layout` | Build or change a layout by applying operations |
-| `list_operations` | The forty-operation vocabulary |
+| `list_operations` | The fifty-three-operation vocabulary |
 | `validate_layout` | Typed errors naming which object offended |
 | `render_layout` | Deterministic SVG |
+| `draw_sheet` | A plan and its sections on one sheet, true to scale |
 | `project_elevation` | An elevation projected from the plan |
+| `project_section` | A section cut through the plan, internal walls and all |
+| `suggest_sections` | Where a section could go, and what each place would show |
 | `list_components` | The window and door stock |
 | `suggest_joins` | Which objects could be pushed together |
 | `suggest_rotation` | Which way an object should face |
 | `check_rules` | Check against rules *you* supply |
+| `overhead_report` | What a section will have to reckon with |
+| `roof_report` | Which roof readings are still missing, as questions |
 | `missing_dimensions` | Which measurements the survey never took |
 
-Ten tools is standing context on every turn, so narrower surfaces exist:
+Fifteen tools is standing context on every turn, so narrower surfaces exist:
 `/v1/core`, `/v1/elevation`, `/v1/advisory`, and they compose
 (`/v1/core+elevation`). A key can carry a profile instead.
 
