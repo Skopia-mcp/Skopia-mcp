@@ -75,10 +75,32 @@ jobs:
         id: key
         run: |
           test -n "$MCP_KEY" || { echo "::error::MCP_REGISTRY_KEY is not set"; exit 1; }
+          # The SHAPE of what was saved, so a refusal can be acted on from a
+          # phone. Length, line count and character classes say what kind of
+          # thing it is; none of it is the value.
+          len=${#MCP_KEY}; lines=$(printf '%s' "$MCP_KEY" | grep -c '' || true)
+          first=$(printf '%s' "$MCP_KEY" | tr -d '[:space:]' | cut -c1)
+          case "$first" in [0-9a-fA-F]) fc="a hex digit";; [A-Za-z]) fc="the letter '$first'";; -) fc="a dash";; *) fc="'$first'";; esac
+          flags=""
+          printf '%s' "$MCP_KEY" | grep -q 'priv:' && flags="$flags openssl-text"
+          printf '%s' "$MCP_KEY" | grep -q -- '-----BEGIN' && flags="$flags pem-armour"
+          printf '%s' "$MCP_KEY" | grep -q '[+/=]' && flags="$flags base64-symbols"
+          printf '%s' "$MCP_KEY" | grep -q ':' && flags="$flags colons"
+          printf '%s' "$MCP_KEY" | grep -q ' ' && flags="$flags spaces"
+          echo "MCP_REGISTRY_KEY shape: $len chars, $lines line(s), starts with $fc, has:${flags:- nothing notable}"
+
           flat=$(printf '%s' "$MCP_KEY" | tr -d '[:space:]')
           hex=""; form=""
           if printf '%s' "$flat" | grep -qE '^[0-9a-fA-F]{64}$'; then
             form=hex; hex=$(printf '%s' "$flat" | tr 'A-F' 'a-f')
+          elif printf '%s' "$MCP_KEY" | grep -q 'priv:'; then
+            # `openssl pkey -text` output: "priv:" then colon-separated bytes.
+            form=openssl-text
+            hex=$(printf '%s\n' "$MCP_KEY" | sed -n '/priv:/,/pub:/p' | grep -v 'priv:\|pub:' | tr -d ' :\n\r\t')
+          elif [ "$(printf '%s' "$flat" | base64 -d 2>/dev/null | wc -c)" = 32 ]; then
+            # The raw seed, base64.
+            form=base64-seed
+            hex=$(printf '%s' "$flat" | base64 -d | od -An -v -tx1 | tr -d ' \n')
           else
             pem=""
             case "$flat" in
