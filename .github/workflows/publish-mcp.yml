@@ -61,13 +61,65 @@ jobs:
         run: |
           curl -L "https://github.com/modelcontextprotocol/registry/releases/latest/download/mcp-publisher_$(uname -s | tr '[:upper:]' '[:lower:]')_$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/').tar.gz" | tar xz mcp-publisher
 
-      # Fails loudly if the secret is missing rather than publishing nothing.
-      - name: Authenticate
+      # The key, in whatever form it was saved. mcp-publisher wants the 64-hex
+      # Ed25519 seed and nothing else, and the first two attempts to set this
+      # secret (2026-09-15) were a PEM and a base64 body, each refused with
+      # "invalid hex private key format" and a single offending byte — no
+      # help to somebody setting a secret from a phone. So the runner reads
+      # hex, a PKCS#8 PEM, that PEM's base64 body, or an OpenSSH private key,
+      # derives the seed, and then checks its PUBLIC half against the one at
+      # datatreehaus.com/.well-known/mcp-registry-auth — which is what the
+      # registry will verify with. A wrong key fails HERE, naming the form it
+      # was read as and the public half it actually carries, never the value.
+      - name: Read the signing key
+        id: key
         run: |
-          test -n "$MCP_KEY" || { echo "MCP_REGISTRY_KEY is not set"; exit 1; }
-          ./mcp-publisher login http --domain=datatreehaus.com --private-key="$MCP_KEY"
+          test -n "$MCP_KEY" || { echo "::error::MCP_REGISTRY_KEY is not set"; exit 1; }
+          flat=$(printf '%s' "$MCP_KEY" | tr -d '[:space:]')
+          hex=""; form=""
+          if printf '%s' "$flat" | grep -qE '^[0-9a-fA-F]{64}$'; then
+            form=hex; hex=$(printf '%s' "$flat" | tr 'A-F' 'a-f')
+          else
+            pem=""
+            case "$flat" in
+              -----BEGINOPENSSH*)
+                form=openssh
+                umask 077; printf '%s\n' "$MCP_KEY" > k.ssh
+                ssh-keygen -p -N '' -m PKCS8 -f k.ssh >/dev/null 2>&1 && pem=$(cat k.ssh) || true
+                rm -f k.ssh;;
+              -----BEGIN*)
+                form=pem; pem=$(printf '%s\n' "$MCP_KEY");;
+              *)
+                form=base64
+                pem=$(printf -- '-----BEGIN PRIVATE KEY-----\n%s\n-----END PRIVATE KEY-----\n' "$(printf '%s' "$flat" | fold -w 64)");;
+            esac
+            if [ -n "$pem" ]; then
+              # PKCS#8 DER for Ed25519 is a fixed 16-byte header, then the seed.
+              hex=$(printf '%s\n' "$pem" | openssl pkey -outform DER 2>/dev/null | tail -c 32 | od -An -v -tx1 | tr -d ' \n') || true
+            fi
+          fi
+          printf '%s' "$hex" | grep -qE '^[0-9a-f]{64}$' || {
+            echo "::error::MCP_REGISTRY_KEY was read as '$form' but no Ed25519 private key could be derived from it. Set the 64-hex seed, a PKCS#8 PEM, or that PEM's base64 body."; exit 1; }
+          echo "MCP_REGISTRY_KEY read as: $form"
+
+          der=$(printf '302e020100300506032b657004220420%s' "$hex" | sed 's/../\\x&/g')
+          pub=$(printf "$der" | openssl pkey -inform DER -pubout -outform DER 2>/dev/null | tail -c 32 | base64 | tr -d '\n')
+          want=$(curl -sSf https://datatreehaus.com/.well-known/mcp-registry-auth | sed -n 's/.*p=\([A-Za-z0-9+/=]*\).*/\1/p' | head -1)
+          if [ -z "$want" ]; then
+            echo "::warning::could not read datatreehaus.com/.well-known/mcp-registry-auth; skipping the public-half check"
+          elif [ "$pub" != "$want" ]; then
+            echo "::error::MCP_REGISTRY_KEY is a valid Ed25519 key but NOT the one whose public half is served at datatreehaus.com/.well-known/mcp-registry-auth. Either set the key that published 0.1.0, or serve this key's public half there: $pub"; exit 1
+          fi
+          echo "the key matches the public half at datatreehaus.com"
+          echo "::add-mask::$hex"
+          echo "hex=$hex" >> "$GITHUB_OUTPUT"
         env:
           MCP_KEY: ${{ secrets.MCP_REGISTRY_KEY }}
+
+      - name: Authenticate
+        run: ./mcp-publisher login http --domain=datatreehaus.com --private-key="$MCP_HEX"
+        env:
+          MCP_HEX: ${{ steps.key.outputs.hex }}
 
       - name: Publish
         run: ./mcp-publisher publish
