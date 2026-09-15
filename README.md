@@ -33,6 +33,14 @@ claude mcp add --transport http skopia \
 Cursor, VS Code, Codex, `.mcp.json`, Claude Desktop (via `mcp-remote`) and
 raw HTTP are covered at [/setup](https://skopia.datatreehaus.com/setup).
 
+**Protocol:** MCP over Streamable HTTP. The server is built on revision
+`2026-07-28` (`server/discover`, no `initialize`) and also speaks the
+initialize-era revisions — `2025-11-25`, `2025-06-18`, `2025-03-26`,
+`2024-11-05` — so an ordinary client just connects: open with `initialize`,
+name your revision in `MCP-Protocol-Version`, and none of the newer
+revision's mirrored headers or `_meta` fields are asked of you. `initialize`
+and `ping` are the only calls that need no key.
+
 ## What it does that a model cannot do for itself
 
 A model asked to draw a floor plan will emit SVG, and it will look entirely
