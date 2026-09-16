@@ -1,8 +1,9 @@
 # Skopia
 
 **A 2D spatial layout engine, reachable as an MCP server.** Define a bounded
-space in real millimetres, place things in it, validate, render, and project
-elevations and sections from the plan — one floor or a whole house.
+space in real millimetres, place things in it, validate, render, project
+elevations and sections from the plan — one floor or a whole house — and hand
+the set on to CAD as a DXF.
 
 ![Ground floor plan of a contemporary house, drawn by the engine](images/ground-floor.png)
 
@@ -214,6 +215,18 @@ past the outer face of the building at both ends. A line given as two points
 is measured against that rule, and one that stops short or runs long at one
 end is reported with both distances rather than left to be noticed on paper.
 
+## On to CAD
+
+`export_dxf` takes what `draw_sheet` takes and answers with one DXF: model
+space, millimetres, y up, the plan at the document's own coordinates so a
+wall measured in AutoCAD is the wall the document stores. Walls are their two
+faces and the jambs at every opening, doors have their swings, fixtures and
+components are the same primitives the sheet draws, and what a section cuts
+is one outlined region with a solid hatch. Layers are named by role — `WALL`,
+`DOOR-SWING`, `CUT-POCHE`, `EVIDENCE` — and carry the engine's three line
+weights, so a plot from CAD matches the sheet. The sheet, the title block and
+the scale bar stay on the sheet: a DXF is model space.
+
 ## When not to use it
 
 If you want one sketch, once, and nobody is going to build from it, emit the
@@ -232,6 +245,7 @@ agent's shoulder.
 | `validate_layout` | Typed errors naming which object offended |
 | `render_layout` | Deterministic SVG |
 | `draw_sheet` | A plan and its sections on one sheet, true to scale |
+| `export_dxf` | The same drawings as one DXF for CAD, at 1:1, layered by role |
 | `project_elevation` | An elevation projected from the plan |
 | `project_section` | A section cut through the plan, internal walls and all |
 | `suggest_sections` | Where a section could go, and what each place would show |
@@ -245,7 +259,7 @@ agent's shoulder.
 | `roof_report` | Which roof readings are still missing, as questions |
 | `missing_dimensions` | Which measurements the survey never took |
 
-Seventeen tools is standing context on every turn, so narrower surfaces exist:
+Eighteen tools is standing context on every turn, so narrower surfaces exist:
 `/v1/core`, `/v1/elevation`, `/v1/advisory`, and they compose
 (`/v1/core+elevation`). A key can carry a profile instead.
 

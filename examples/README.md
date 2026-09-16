@@ -15,6 +15,7 @@ export SKOPIA_KEY=$(curl -sS -X POST \
 | | |
 |---|---|
 | [`build-a-room.sh`](./build-a-room.sh) | A room, two tables, a join suggestion and an SVG in three calls |
+| [`export-dxf.sh`](./export-dxf.sh) | A room with a door, a window, a bath and a WC, as a DXF for CAD, in two calls |
 
 ## What to notice
 
