@@ -38,8 +38,14 @@ claude mcp add --transport http skopia \
   --header "Authorization: Bearer YOUR_KEY"
 ```
 
-Cursor, VS Code, Codex, `.mcp.json`, Claude Desktop (via `mcp-remote`) and
-raw HTTP are covered at [/setup](https://skopia.datatreehaus.com/setup).
+Cursor, VS Code, Codex, `.mcp.json` and raw HTTP are covered at
+[/setup](https://skopia.datatreehaus.com/setup).
+
+**ChatGPT, Claude Desktop and claude.ai need no key at all.** Their
+connector dialogs take an MCP server that speaks OAuth, and this one does:
+paste `https://skopia.datatreehaus.com/v1`, and the consent page mints a key
+for that connection which you never see. No account is created; the key is
+the whole of it, and it is revocable like any other.
 
 **Protocol:** MCP over Streamable HTTP. The server is built on revision
 `2026-07-28` (`server/discover`, no `initialize`) and also speaks the
