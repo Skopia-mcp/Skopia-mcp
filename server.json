@@ -2,8 +2,8 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.datatreehaus/skopia-floor-plan-layout",
   "title": "Skopia",
-  "description": "Floor plans in real millimetres: doors, windows, tables; validate, render SVG, elevations, sections.",
-  "version": "0.2.0",
+  "description": "Floor plans in real mm: doors, windows, fixtures; validate, render, elevations, sections, storeys.",
+  "version": "0.3.0",
   "websiteUrl": "https://skopia.datatreehaus.com",
   "repository": {
     "url": "https://github.com/Skopia-mcp/Skopia-mcp",

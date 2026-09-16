@@ -2,7 +2,14 @@
 
 **A 2D spatial layout engine, reachable as an MCP server.** Define a bounded
 space in real millimetres, place things in it, validate, render, and project
-elevations and sections from the plan.
+elevations and sections from the plan — one floor or a whole house.
+
+![Ground floor plan of a contemporary house, drawn by the engine](images/ground-floor.png)
+
+*A contemporary house, ground floor: built and furnished through the
+operations an agent calls, every fixture from the stock and turned by the wall
+it names, both cut lines placed by rule. The engine's own render of the
+document, not a drawing of it.*
 
 ```
 https://skopia.datatreehaus.com/v1
@@ -135,6 +142,78 @@ drawing that comes out blank. We have done all three.
 We have **not** run the other side cold. There is no A/B here and we will not
 imply one.
 
+## A house is storeys
+
+![First floor plan of the same house](images/first-floor.png)
+
+*The first floor, a second document against the same datum. The stair arrives
+where the ground floor's leaves; a section through both is one drawing, joined
+by the engine and checked at the junction.*
+
+A storey is not a new kind of thing. Each floor is an ordinary document with
+its own heights against one shared datum, and a section or an elevation is
+projected from every floor and **joined** into one drawing: the same wall
+stated by two floors is one band from the slab to the eaves, an elevation
+face runs through the floor line with no seam, and the junction is drawn as
+one outline because every floor's cut is in one region. Alignment comes from
+two fixed points you name on every plan (`vertex:0.outer` — the outer corner,
+which stays put when a wall thins upstairs), and it is checked, never
+fitted: a rotated survey, a floor that stops short of the one above, or a
+ceiling that does not meet the floor construction over it is refused with
+the millimetres. The basis is reported in numbers and, on request, drawn on
+every plan and joined drawing, so nobody has to take the join on trust.
+`draw_sheet` takes `storeys` instead of `document` and does all of this on the
+way to the paper.
+
+## Furniture that draws itself in section
+
+A bath, a base unit, a WC, a stair: `{ "op": "add_fixture", "type": "bath",
+"at": {x, y} }` places one at a typical trade size, by the corner that goes
+into the room's corner. The plan shows it as what it is; a section sees it
+beyond the plane as the face it is looking at, and cuts it as its own
+profile — the tub, the worktop over the carcass, the flight's sawtooth —
+with which face and which profile derived from how it is turned. Its extent
+on the section is a reference to the plan, so it lands where the plan put it.
+Twenty-two types, kitchen, bathroom and bedroom, and none of them carries a
+regulation: sizes are trade sizes, and clearances are yours to state.
+
+## A fixture knows which way it goes
+
+Every type in the stock carries its placement rules: whether its back
+belongs against a wall, and how much a person needs clear off each edge to
+use it. Place one with `against: {wall}` and the engine turns it to face
+into the room; validation reads the rules back and names a WC facing its
+wall, a basin floating, a sofa with its seat to the wall, and what is in the
+way. Findings, not refusals.
+
+## Roof windows
+
+`{ "op": "add_rooflight", "x", "y", "w", "d" }` puts a window in the roof.
+Which slope it sits in and how far up it are derived from the roof the plan
+already carries: it shows on the elevation that faces that slope, at the
+height the pitch gives it, and on no other. Through a flat roof a section
+opens the ceiling where the plane crosses it, with the kerb and the glass.
+
+## One style, in the engine
+
+Every drawing comes out the same way: solid black poché for what the plane
+cuts, a white ground inside and out, furniture and fittings as fine outline
+with no fills, three line weights, one light tone for a roof or a cill seen
+against a face, one tint for glass. It is how the leading practices present
+plans, and it lives in the drawing functions rather than in anything you
+pass — a plan, a section and an elevation of the same house cannot come out
+in three styles.
+
+## Section marks, by rule
+
+A cut line wears a head from a small family, the bubble by default: a
+filled triangle pointing the way you look, a circle over it, the reference in
+the pointed half. Place it as a point and a direction (`add_section` with
+`through` and `along`) and the engine runs the line evenly a metre and a half
+past the outer face of the building at both ends. A line given as two points
+is measured against that rule, and one that stops short or runs long at one
+end is reported with both distances rather than left to be noticed on paper.
+
 ## When not to use it
 
 If you want one sketch, once, and nobody is going to build from it, emit the
@@ -149,14 +228,16 @@ agent's shoulder.
 | | |
 |---|---|
 | `edit_layout` | Build or change a layout by applying operations |
-| `list_operations` | The fifty-three-operation vocabulary |
+| `list_operations` | The fifty-seven-operation vocabulary |
 | `validate_layout` | Typed errors naming which object offended |
 | `render_layout` | Deterministic SVG |
 | `draw_sheet` | A plan and its sections on one sheet, true to scale |
 | `project_elevation` | An elevation projected from the plan |
 | `project_section` | A section cut through the plan, internal walls and all |
 | `suggest_sections` | Where a section could go, and what each place would show |
+| `join_drawings` | One section or elevation across several storeys, junction checked and drawn clean |
 | `list_components` | The window and door stock |
+| `list_fixtures` | The kitchen, bathroom and furniture stock, drawn on plan and through a section |
 | `suggest_joins` | Which objects could be pushed together |
 | `suggest_rotation` | Which way an object should face |
 | `check_rules` | Check against rules *you* supply |
@@ -164,7 +245,7 @@ agent's shoulder.
 | `roof_report` | Which roof readings are still missing, as questions |
 | `missing_dimensions` | Which measurements the survey never took |
 
-Fifteen tools is standing context on every turn, so narrower surfaces exist:
+Seventeen tools is standing context on every turn, so narrower surfaces exist:
 `/v1/core`, `/v1/elevation`, `/v1/advisory`, and they compose
 (`/v1/core+elevation`). A key can carry a profile instead.
 
