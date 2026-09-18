@@ -1,9 +1,16 @@
 # Skopia
 
-**A 2D spatial layout engine, reachable as an MCP server.** Define a bounded
-space in real millimetres, place things in it, validate, render, project
-elevations and sections from the plan — one floor or a whole house — and hand
-the set on to CAD as a DXF.
+**Describe a building; Skopia draws it — plan, section and elevation, from
+one document.** You give it a brief or a measured survey. It draws the floor
+plan in a CAD register, in real millimetres, and then projects the **section**
+and the **elevation** of that same building from the same document, so the
+three drawings cannot disagree with each other. One floor or a whole house.
+Then a true-to-scale sheet, or a **DXF** to refine in AutoCAD, Revit or
+Vectorworks.
+
+Every drawing draws itself, whole and at its own scale: the plan, each
+section and each elevation come back as an SVG to look at and check. A sheet
+is where drawings go once they are right, not where you start.
 
 ![Ground floor plan of a contemporary house, drawn by the engine](images/ground-floor.png)
 
@@ -11,6 +18,12 @@ the set on to CAD as a DXF.
 operations an agent calls, every fixture from the stock and turned by the wall
 it names, both cut lines placed by rule. The engine's own render of the
 document, not a drawing of it.*
+
+![Section A-A through the same house, projected from the plan](images/section-A.png)
+
+*Section A–A, cut on the line marked in the plan above and projected from the
+same document. Nothing here was drawn twice: the window is the plan's window
+and the kitchen is the plan's kitchen.*
 
 ```
 https://skopia.datatreehaus.com/v1
@@ -148,6 +161,39 @@ So: naming a component removes a *class* of error, not the category. An agent
 can still ask for the wrong one, point a section the wrong way, or produce a
 drawing that comes out blank. We have done all three.
 
+## And then the ENGINE was wrong, four times in two days, with its suite green
+
+The most useful evidence we have, because this is code written for nothing
+else, under 680 tests, and every one of these still shipped and was caught by
+a person looking at a drawing at a size they could read:
+
+- A section that **stopped at the wall head**, so a house came back as a box
+  with nothing on top while the elevation beside it drew the roof correctly.
+- Then that roof, drawn right, **floating above gable walls** that stopped at
+  the eaves — a wall stops at the head only where the roof comes *down* to it.
+- **One bowed segment refusing every section and every elevation**, because
+  the guard sat where both projections shared it.
+- Ordinates reaching callers as `-85.66329565734681`, because every
+  axis-aligned corner projects to a whole millimetre unaided and nothing
+  showed it until a curve.
+
+If code with a test suite and exactly one job gets those wrong, SVG written in
+one pass will not get them right. What it will do is render.
+
+**The arithmetic, with the numbers.** None of it is exotic; it is what an
+elevation *is*:
+
+| | |
+|---|---|
+| A 1,200 window on a **bowed** wall | draws **1,168** in elevation; a 900 door draws 890 |
+| A roof **course** | draws at `gauge × sin(pitch)` — a 100 gauge is **62.5** on a 39° roof |
+| Drawing the true gauge instead | courses **1.6× too far apart**, a third too few |
+| A roof **250 thick** perpendicular | reads **317** vertically at that pitch |
+| A **gable end** | shows *no* tile courses at all — what you see there is the verge |
+
+Every one of those renders cleanly, and not one is the sort of thing a reader
+spots.
+
 We have **not** run the other side cold. There is no A/B here and we will not
 imply one.
 
@@ -203,6 +249,14 @@ already carries: it shows on the elevation that faces that slope, at the
 height the pitch gives it, and on no other. Through a flat roof a section
 opens the ceiling where the plane crosses it, with the kerb and the glass.
 
+**A section cuts a PITCHED roof too**, when `heights.construction.roof` gives
+its thickness — rafter lines mitred at the ridge, the underside offset
+perpendicular to the slope rather than vertically, exact at any cut angle.
+The thickness is given, never derived, and absent means not drawn. A wall
+stops at `wall_head` only where the roof comes down to it, so a gable end and
+a lean-to's high wall carry on up to the roof's underside rather than leaving
+it resting on nothing.
+
 ## One style, in the engine
 
 Every drawing comes out the same way: solid black poché for what the plane
@@ -223,7 +277,29 @@ past the outer face of the building at both ends. A line given as two points
 is measured against that rule, and one that stops short or runs long at one
 end is reported with both distances rather than left to be noticed on paper.
 
+## The order the work goes in
+
+1. **The plan.** `edit_layout` — corners in walking order, `close_room`, then
+   openings, partitions, fixtures, a roof. You name a door; you never draw
+   one.
+2. **Check it.** `validate_layout` after every batch, and act on the
+   findings. A WC facing the tiles or a sofa with nowhere to sit is named.
+3. **Look at it.** `render_layout`.
+4. **The section and the elevation.** `project_section` and
+   `project_elevation`. Each draws itself — a whole SVG, true to scale — so
+   look at each one. `scale: 20` to read a junction. This is the step that
+   catches things.
+5. **Then paper or CAD.** `draw_sheet`, `export_dxf`, or both.
+
+Step 5 is deliberately last. A section in a cell on an A3 at 1:50 is 200mm
+wide, and a wrong cill or a missing jamb is invisible at that size — a sheet
+is where drawings go once they are right, not how you find out whether they
+are.
+
 ## On to CAD
+
+**A drawing produced here is a base drawing somebody refines, not a finished
+issue** — which is exactly what the DXF is for.
 
 `export_dxf` takes what `draw_sheet` takes and answers with one DXF: model
 space, millimetres, y up, the plan at the document's own coordinates so a
@@ -232,8 +308,14 @@ faces and the jambs at every opening, doors have their swings, fixtures and
 components are the same primitives the sheet draws, and what a section cuts
 is one outlined region with a solid hatch. Layers are named by role — `WALL`,
 `DOOR-SWING`, `CUT-POCHE`, `EVIDENCE` — and carry the engine's three line
-weights, so a plot from CAD matches the sheet. The sheet, the title block and
-the scale bar stay on the sheet: a DXF is model space.
+weights, so a plot from CAD matches the sheet. Layer names are permanent, so
+a practice's own template maps onto them. Sections and elevations go in the
+same file, laid out on one datum. The sheet, the title block and the scale
+bar stay on the sheet: a DXF is model space.
+
+Open it in **AutoCAD, Revit or Vectorworks** and take the drawing further.
+Walls arrive as faces and jambs rather than as a filled band, which is what
+makes them editable on the other side.
 
 ## When not to use it
 
