@@ -39,13 +39,17 @@ OPS='[{"op":"place_corner","x":0,"y":0},
 DOC=$(rpc tools/call "\"name\":\"edit_layout\",\"arguments\":{\"operations\":$OPS}," edit_layout \
       | python3 -c 'import sys,json; print(json.dumps(json.load(sys.stdin)["result"]["structuredContent"]["document"]))')
 
-echo "2. Export it. The DXF is the first text block; the placements are the second."
-rpc tools/call "\"name\":\"export_dxf\",\"arguments\":{\"document\":$DOC,\"scale\":50}," export_dxf \
+echo "2. Export it. The file comes back as a link, valid an hour for this key."
+URL=$(rpc tools/call "\"name\":\"export_dxf\",\"arguments\":{\"document\":$DOC,\"scale\":50}," export_dxf \
   | python3 -c '
 import sys, json
 r = json.load(sys.stdin)["result"]
-open("room.dxf", "w").write(r["content"][0]["text"])
-meta = json.loads(r["content"][1]["text"])
-print("   wrote room.dxf:", meta["entities"], "entities on", len(meta["layers"]), "layers")
-print("   weights (paper mm):", json.dumps(meta["weights"]))
-print("   open it in AutoCAD, Vectorworks, Revit, LibreCAD, or any DXF viewer")'
+meta = r["structuredContent"]
+print("  ", meta["entities"], "entities on", len(meta["layers"]), "layers;", meta["file"]["bytes"], "bytes", file=sys.stderr)
+print("   weights (paper mm):", json.dumps(meta["weights"]), file=sys.stderr)
+print(meta["file"]["url"])')
+
+echo "3. Fetch it with the same key."
+curl -sS -H "Authorization: Bearer $SKOPIA_KEY" "$URL" -o room.dxf
+echo "   wrote room.dxf: open it in AutoCAD, Vectorworks, Revit, LibreCAD, or any DXF viewer"
+echo "   (a caller with no way to fetch a URL passes \"deliver\":\"inline\" and gets the DXF as the first text block)"

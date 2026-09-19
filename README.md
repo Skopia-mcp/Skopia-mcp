@@ -309,7 +309,10 @@ components are the same primitives the sheet draws, and what a section cuts
 is one outlined region with a solid hatch. Layers are named by role — `WALL`,
 `DOOR-SWING`, `CUT-POCHE`, `EVIDENCE` — and carry the engine's three line
 weights, so a plot from CAD matches the sheet. Layer names are permanent, so
-a practice's own template maps onto them. Sections and elevations go in the
+a practice's own template maps onto them. The file comes back as a link
+(`file.url`), valid for an hour and for the key that made it, fetched with
+that key as a bearer, so the DXF never passes through the conversation;
+`deliver: "inline"` asks for it as text instead. Sections and elevations go in the
 same file, laid out on one datum. The sheet, the title block and the scale
 bar stay on the sheet: a DXF is model space.
 
